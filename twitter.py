@@ -45,6 +45,16 @@ def preprocess(all_tweets):
         if first_word == 'RT': #pseudo retweet
             continue
         word_list = [word for word in word_list if 'http' not in word]
+        for word in word_list:
+            if 'http' in word:
+                continue
+            char_pairs = "\"'()[]"
+            new_word = word
+            if word[-1] != '.': #only do these corrections if not end of a sentance
+                if word[0] in char_pairs and word[-1] not in char_pairs:
+                    new_word = word[1:]
+                if word[-1] in char_pairs and word[0] not in char_pairs:
+                    new_word = word[:-2]
         tweet_array.append(word_list)
     return tweet_array
 
@@ -78,9 +88,18 @@ def generate_tweet (word_dict):
         next_word = random.choice( word_dict[current_word] )
         new_tweet.append( next_word )      
         if next_word not in key_list:
+            new_tweet.append( "N/A" )      
             break
     del new_tweet[-1]
+
+    last_word_list = list(new_tweet[-1])
+    if last_word_list[0] not in "@#" and last_word_list[-1] not in '.,:?!%"\'':
+        last_word_list.append('.')
+    last_word = ''.join(last_word_list)
+    new_tweet[-1] = last_word
+
     tweet_text = " ".join( new_tweet )
+    tweet_text = tweet_text.capitalize()
     return tweet_text
     
 if __name__ == '__main__':
