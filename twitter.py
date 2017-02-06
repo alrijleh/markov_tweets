@@ -1,5 +1,6 @@
 import tweepy
 import pickle
+import random
 
 def download_tweets():
     with open("credentials.pickle", "rb") as f:
@@ -25,3 +26,68 @@ def download_tweets():
 
     with open("tweets.pickle", "wb") as f:
         pickle.dump(all_tweets, f)
+
+def print_tweets(tweets):
+    for tweet in tweets:
+        print("---\n" + " ".join(tweet))
+
+with open("tweets.pickle", "rb") as f:
+    all_tweets = pickle.load(f)
+
+def preprocess(all_tweets):
+    tweet_array = []
+
+    for tweet in all_tweets:
+        word_list = tweet.split()
+        first_word = word_list[0]
+        if '@' in first_word and ':' in first_word: #quote
+            continue
+        if first_word == 'RT': #pseudo retweet
+            continue
+        word_list = [word for word in word_list if 'http' not in word]
+        tweet_array.append(word_list)
+    return tweet_array
+
+def load_file(filename):
+    with open("tweets.txt", "r") as f:
+        data = [line.strip() for line in f]
+        return data
+
+def build_chain(tweet_list):
+    word_dict = {}
+    for tweet in tweet_list:
+        first_word = tweet[0]
+        last_word = tweet[-1]
+        for word_index in range(len(tweet)):
+            current_word = tweet[word_index]
+            if current_word is not last_word:
+                next_word = tweet[word_index + 1]
+                if current_word not in word_dict:
+                    word_dict[current_word] = []
+                word_dict[current_word].append(next_word)
+    return word_dict
+
+def generate_tweet (word_dict):
+    key_list = list( word_dict.keys() )
+    first_word = random.choice ( key_list )
+    new_tweet = [first_word]
+
+    while len( " ".join(new_tweet)) < 140:
+        current_word = new_tweet[-1]
+        next_word = random.choice( word_dict[current_word] )
+        if next_word not in key_list:
+            break
+        new_tweet.append( next_word )      
+    del new_tweet[-1]
+    tweet_text = " ".join( new_tweet )
+    return tweet_text
+    
+
+if __name__ == '__main__':
+    tweets = load_file("tweets.txt")
+    tweets = preprocess(tweets)
+    word_dict = build_chain(tweets)
+    new_tweet = generate_tweet(word_dict)
+    print( new_tweet )
+
+
