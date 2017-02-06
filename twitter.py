@@ -76,9 +76,9 @@ def generate_tweet (word_dict):
     while len( " ".join(new_tweet)) < 140:
         current_word = new_tweet[-1]
         next_word = random.choice( word_dict[current_word] )
+        new_tweet.append( next_word )      
         if next_word not in key_list:
             break
-        new_tweet.append( next_word )      
     del new_tweet[-1]
     tweet_text = " ".join( new_tweet )
     return tweet_text
