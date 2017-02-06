@@ -51,6 +51,7 @@ def preprocess(all_tweets):
 def load_file(filename):
     with open("tweets.txt", "r") as f:
         data = [line.strip() for line in f]
+        data = data[:8074] #only tweets after candidacy
         return data
 
 def build_chain(tweet_list):
@@ -82,12 +83,11 @@ def generate_tweet (word_dict):
     tweet_text = " ".join( new_tweet )
     return tweet_text
     
-
 if __name__ == '__main__':
     tweets = load_file("tweets.txt")
     tweets = preprocess(tweets)
     word_dict = build_chain(tweets)
-    new_tweet = generate_tweet(word_dict)
-    print( new_tweet )
-
-
+    while True:
+        new_tweet = generate_tweet(word_dict)
+        print( new_tweet )
+        input()
