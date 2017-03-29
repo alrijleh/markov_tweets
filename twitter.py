@@ -67,7 +67,7 @@ def generate_tweet (word_dict):
     while True:
         first_word = random.choice ( key_list )
         new_tweet = [first_word]
-        while len( " ".join(new_tweet)) < 140:
+        while len( " ".join(new_tweet)) < (140 - len('@realDonaldTrump ')):
             current_word = new_tweet[-1]
             next_word = random.choice( word_dict[current_word] )
             new_tweet.append( next_word )
@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
             for new_tweet in new_tweets:
                 word_dict = add_to_chain([new_tweet], word_dict)
-                #update_files(new_tweet, last_tweet_id)
+                update_files(new_tweet, last_tweet_id)
 
             generated_tweet = generate_tweet(word_dict)
             generated_tweet = postprocess_tweet(generated_tweet)
