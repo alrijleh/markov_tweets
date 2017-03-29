@@ -89,8 +89,9 @@ def postprocess_tweet (new_tweet):
     new_tweet[-1] = last_word
 
     #Combine word array to string
+    new_tweet[0] = new_tweet[0].capitalize()
+    new_tweet.insert(0, '@realDonaldTrump')
     tweet_text = " ".join( new_tweet )
-    tweet_text = tweet_text.capitalize()
 
     #Remove lonely quotations & parens
     if tweet_text.count('"') %2 == 1:
@@ -135,4 +136,5 @@ if __name__ == '__main__':
             generated_tweet = generate_tweet(word_dict)
             generated_tweet = postprocess_tweet(generated_tweet)
             api.update_status(generated_tweet, last_tweet_id)
+            print(generated_tweet)
             time.sleep(2)
