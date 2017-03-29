@@ -1,6 +1,8 @@
 import tweepy
+import time
 import pickle
 import random
+import string
 import os.path
 
 def authenticate():
@@ -12,64 +14,41 @@ def authenticate():
 
     api = tweepy.API(auth)
     return api
-    
-def download_tweets(api):
 
-    all_tweets = []
-
-    new_tweets = api.user_timeline(screen_name = 'realDonaldTrump', count = 100)
-    all_tweets.extend(new_tweets)
-    max_id = all_tweets[-1].id - 1
-
-    while len(new_tweets) > 0:
-        new_tweets = api.user_timeline(screen_name = 'realDonaldTrump', count = 100, max_id = max_id)
-        all_tweets.extend(new_tweets)
-        max_id = all_tweets[-1].id - 1
-        if (max_id == last_max_id):
-            break
-
-        print(all_tweets[-1].text)
-
-    return all_tweets
-    #with open("tweets.pickle", "wb") as f:
-    #    pickle.dump(all_tweets, f)
-
-def print_tweets(tweets):
-    for tweet in tweets:
-        print("---\n" + " ".join(tweet))
-
-def preprocess(all_tweets):
-    tweet_array = []
-
-    for tweet in all_tweets:
-        word_list = tweet.split()
-        first_word = word_list[0]
-        if '@' in first_word and ':' in first_word: #quote
+def preprocess(tweet):
+    tweet = ''.join( filter(lambda x: x in string.printable, tweet) )
+    word_list = tweet.split()
+    if not word_list:
+        return False
+    first_word = word_list[0]
+    if '@' in first_word and ':' in first_word: #quote
+        return False
+    if first_word == 'RT': #pseudo retweet
+        return False
+    word_list = [word for word in word_list if 'http' not in word]
+    for word in word_list:
+        if 'http' in word:
             continue
-        if first_word == 'RT': #pseudo retweet
-            continue
-        word_list = [word for word in word_list if 'http' not in word]
-        for word in word_list:
-            if 'http' in word:
-                continue
-            char_pairs = "\"'()[]"
-            new_word = word
-            if word[-1] != '.': #only do these corrections if not end of a sentance
-                if word[0] in char_pairs and word[-1] not in char_pairs:
-                    new_word = word[1:]
-                if word[-1] in char_pairs and word[0] not in char_pairs:
-                    new_word = word[:-2]
-        tweet_array.append(word_list)
-    return tweet_array
+        char_pairs = "\"'()[]"
+        new_word = word
+        if word[-1] != '.': #only do these corrections if not end of a sentance
+            if word[0] in char_pairs and word[-1] not in char_pairs:
+                new_word = word[1:]
+            if word[-1] in char_pairs and word[0] not in char_pairs:
+                new_word = word[:-2]
+    tweet = word_list
+    return tweet
 
 def load_file(filename):
     with open("tweets.txt", "r") as f:
         data = [line.strip() for line in f]
-        data = data[:8074] #only tweets after candidacy
-        return data
 
-def build_chain(tweet_list):
-    word_dict = {}
+    with open("last_id.txt", "r") as f:
+        last_id = int(f.read())
+
+    return data, last_id
+
+def add_to_chain(tweet_list, word_dict):
     for tweet in tweet_list:
         first_word = tweet[0]
         last_word = tweet[-1]
@@ -91,7 +70,7 @@ def generate_tweet (word_dict):
         while len( " ".join(new_tweet)) < 140:
             current_word = new_tweet[-1]
             next_word = random.choice( word_dict[current_word] )
-            new_tweet.append( next_word )      
+            new_tweet.append( next_word )
             if next_word not in key_list:
                 #finish tweet if a finisher is found
                 return new_tweet
@@ -100,7 +79,7 @@ def generate_tweet (word_dict):
                 #ensure last word is a valid finisher
                 return new_tweet
             del new_tweet[-1]
-            
+
 def postprocess_tweet (new_tweet):
     #Last word punctuation
     last_word_list = list(new_tweet[-1])
@@ -108,11 +87,11 @@ def postprocess_tweet (new_tweet):
         last_word_list.append('.')
     last_word = ''.join(last_word_list)
     new_tweet[-1] = last_word
-    
+
     #Combine word array to string
     tweet_text = " ".join( new_tweet )
     tweet_text = tweet_text.capitalize()
-    
+
     #Remove lonely quotations & parens
     if tweet_text.count('"') %2 == 1:
         tweet_text = tweet_text.replace('"','')
@@ -122,21 +101,38 @@ def postprocess_tweet (new_tweet):
 
     return tweet_text
     
-def watch_for_new_tweet(api):
-    with open('tweets.pickle') as f:
-        last_id, all_tweets = pickle.load(f)
+def get_new_tweet(api, last_id):
+    latest_tweets = api.user_timeline(screen_name = 'realDonaldTrump', count = 20)
+    tweets = [tweet.text for tweet in latest_tweets if tweet.id > last_id]
+    if tweets:
+        return [tweets, latest_tweets[0].id]
 
-    latest_tweet = api.user_timeline(screen_name = 'realDonaldTrump', count = 1)
-    if latest_tweet.id > last_id:
-        return latest_tweet
+    return [False, last_id]
 
+def update_files(tweet, last_tweet_id):
+    with open('last_id.txt', 'w') as f:
+        f.write(str(last_tweet_id))
+    with open('tweets.txt', 'a') as f:
+        tweet_text = " ".join( tweet ) + '\r\n'
+        f.write(tweet_text)
 
 if __name__ == '__main__':
-    tweets = load_file("tweets.txt")
-    tweets = preprocess(tweets)
-    word_dict = build_chain(tweets)
-    while True:
-        new_tweet = generate_tweet(word_dict)
-        new_tweet = postprocess_tweet(new_tweet)
-        print( new_tweet )
-        input()
+    api = authenticate()
+
+    old_tweets, last_tweet_id = load_file("tweets.txt")
+    old_tweets = [preprocess(tweet) for tweet in old_tweets if preprocess(tweet)]
+    word_dict = add_to_chain(old_tweets, {})
+
+    while True: #should be a controlled infinite while loop or something
+        new_tweets, last_tweet_id = get_new_tweet(api, last_tweet_id)
+        if new_tweets:
+            new_tweets = [preprocess(tweet) for tweet in new_tweets if preprocess(tweet)]
+
+            for new_tweet in new_tweets:
+                word_dict = add_to_chain([new_tweet], word_dict)
+                #update_files(new_tweet, last_tweet_id)
+
+            generated_tweet = generate_tweet(word_dict)
+            generated_tweet = postprocess_tweet(generated_tweet)
+            api.update_status(generated_tweet, last_tweet_id)
+            time.sleep(2)
