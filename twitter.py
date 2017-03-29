@@ -137,4 +137,4 @@ if __name__ == '__main__':
             generated_tweet = postprocess_tweet(generated_tweet)
             api.update_status(generated_tweet, last_tweet_id)
             print(generated_tweet)
-            time.sleep(2)
+        time.sleep(2)
